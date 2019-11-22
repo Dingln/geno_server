@@ -1,29 +1,26 @@
-import sys
+import json
 import os
-import shutil
 import psutil
+import requests
+import shutil
+import sys
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import json
-from foo_IO import *
-import requests
+from fileio import *
+
+DEV_LIST_FILE = "devep_data/dev_list.txt"
+PORT_LIST_FILE = "devep_data/port_list.txt"
+PID_LIST_FILE = "devep_data/pid_list.txt"
 
 
 class Manager:
-    dev_list = []
-    pid_list = []
-    port_list = []
-    dev_dict = dict()
-
     def __init__(self, dev_file, port_file, pid_file):
         self.dev_dict, self.dev_list, self.port_list = load_dev_port(dev_file, port_file)
-        self.pid_list = load_pidList(pid_file)
+        self.pid_list = load_list(pid_file)
 
-    def check_dev_id_is_exist(self, dev_id):
-        for cur_id in self.dev_list:
-            if int(cur_id) == dev_id:
-                return True
-        return False
+    def dev_id_exists(self, dev_id):
+        return dev_id in self.dev_list
 
 
 class Model:
@@ -33,7 +30,7 @@ class Model:
     is_exist = False
     dev_data_dir = "\0"
     dev_model_dir = "\0"
-    newport = -1
+    new_port = -1
 
     def __init__(self):
         self.cur_pid = os.getpid()
@@ -50,25 +47,31 @@ class Model:
         if not self.is_exist:
             if os.path.exists(self.dev_model_dir):
                 shutil.rmtree(self.dev_model_dir)
+
             if not os.path.exists(self.dev_data_dir):
-                os.mkdir(self.dev_data_dir)
-                os.popen("cp data/stories.md " + self.dev_data_dir + "/stories.md")
-                os.popen("cp data/nlu.md " + self.dev_data_dir + "/nlu.md")
-            write_file(str(self.dev_id), "devep_data/dev_list.txt")
+                os.makedirs(self.dev_data_dir)
+                # shutil.copyfile("data/stories.md",
+                #                 self.dev_data_dir + "/stories.md")
+                # shutil.copyfile("data/nlu.md", self.dev_data_dir + "/nlu.md")
+
+            write_file(self.dev_id, DEV_LIST_FILE)
+
             if len(manager.port_list) == 0:
-                self.newport = "5005"
+                self.new_port = 5005
             else:
-                self.newport = "5005" # str(int(max(manager.port_list)) + 1)
-            write_port(self.newport, "devep_data/port_list.txt")
-            write_pid(self.cur_pid, "devep_data/pid_list.txt")
+                self.new_port = max(manager.port_list) + 1
+
+            write_file(self.new_port, PORT_LIST_FILE)
+            write_file(self.cur_pid, PID_LIST_FILE)
         else:
-            self.newport = manager.dev_dict[self.dev_id]
+            self.new_port = manager.dev_dict[self.dev_id]
             pid_index = manager.dev_list.index(self.dev_id)
             old_pid = manager.pid_list[pid_index]
-            os.popen("kill -9 " + str(old_pid))
-            kill_port(self.newport)
+            psutil.Process(old_pid).kill()
+            kill_port(self.new_port)
             manager.pid_list[pid_index] = self.cur_pid
-            update_pid(manager.pid_list, "devep_data/pid_list.txt")
+            update_pid(manager.pid_list, PID_LIST_FILE)
+
         write_file(self.training_data,
                    "devep_data/dev_{}/nlu.md".format(self.dev_id))
 
@@ -83,7 +86,8 @@ class Model:
         for tmp in train_cmd_resp.readlines():
             print(tmp)
 
-        run_cmd = "cd {}; rasa run --enable-api -p {} -m {}".format(os.getcwd(), self.newport, self.dev_data_dir)
+        run_cmd = "cd {}; rasa run --enable-api -p {} -m {}".format(os.getcwd(), self.new_port, self.dev_model_dir)
+        print("DIRR", self.dev_model_dir)
         run_cmd_resp = os.popen(run_cmd)
         print(run_cmd)
         for tmp in run_cmd_resp.readlines():
@@ -118,7 +122,7 @@ def train():
     geno_data.intent = request.json['intent']
     geno_data.queries = request.json['queries']
     geno_data.create_data()
-    geno_model.is_exist = global_manager.check_dev_id_is_exist(geno_model.dev_id)
+    geno_model.is_exist = global_manager.dev_id_exists(geno_model.dev_id)
     geno_model.train_run_model(request.json['dev_id'], geno_data.training_data, global_manager)
 
     result = {'entities': geno_model.training_data}
@@ -127,7 +131,7 @@ def train():
 
 @app.route('/response',  methods=['GET'])
 def response():
-    post_url = "http://localhost:" + str(geno_model.newport) + "/model/parse"
+    post_url = "http://localhost:{}/model/parse".format(geno_model.new_port)
     data = json.dumps(dict(text=request.args['query']))
     resp = requests.post(post_url, data)
     return resp.content

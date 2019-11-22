@@ -17,4 +17,5 @@ elif sys.argv[1] == "response":
 
 print(res.headers)
 print(res.text)
+exit()
 
