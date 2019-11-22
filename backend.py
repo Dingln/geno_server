@@ -8,7 +8,6 @@ import sys
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from fileio import *
 
 from rasa.nlu.training_data import load_data
 from rasa.nlu.components import ComponentBuilder
@@ -77,13 +76,14 @@ class Model:
         self.dev_id = dev_id
         self.dev_data_dir = "devep_data/dev_{}".format(self.dev_id)
         self.dev_model_dir = "devep_model/dev_{}".format(self.dev_id)
+        self.dev_train_file = "devep_data/dev_{}/nlu.md".format(self.dev_id)
         self.training_data = None
         self.interpreter = None
 
     def train(self, training_data):
         # Store new training data into file (TODO: use rasa function?)
-        write_file(training_data,
-                   "devep_data/dev_{}/nlu.md".format(self.dev_id))
+        with open(self.dev_train_file, 'a+') as f:
+            f.write(training_data)
 
         # Train Rasa model
         self.training_data = load_data(self.dev_data_dir)
