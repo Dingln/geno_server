@@ -1,5 +1,6 @@
 import json
 import os
+import pickle
 import psutil
 import requests
 import shutil
@@ -10,84 +11,92 @@ from flask_cors import CORS
 from fileio import *
 
 from rasa.nlu.training_data import load_data
+from rasa.nlu.components import ComponentBuilder
 from rasa.nlu.config import RasaNLUModelConfig
-from rasa.nlu.model import Trainer
+from rasa.nlu.model import Interpreter, Trainer
 from rasa.nlu import config
 
-DEV_LIST_FILE = "devep_data/dev_list.txt"
-PORT_LIST_FILE = "devep_data/port_list.txt"
-PID_LIST_FILE = "devep_data/pid_list.txt"
+DEV_LIST_FILE = "devep_data/dev_list"
+RASA_CONFIG_FILE = "config/config.yml"
 
 
 class Manager:
-    def __init__(self, dev_file, port_file, pid_file):
-        self.dev_dict, self.dev_list, self.port_list = load_dev_port(dev_file, port_file)
-        self.pid_list = load_list(pid_file)
+    def __init__(self, dev_file):
+        self.dev_file = dev_file
+        self.devs = self.load_devs()
+        self.models = {}  # Empty, lazy load pre-existing models in get_model
+        
+        # Cache components between pipelines (where possible)
+        self.builder = ComponentBuilder(use_cache=True)
 
-    def dev_id_exists(self, dev_id):
-        return dev_id in self.dev_list
+    def load_devs(self):
+        try:
+            with open(self.dev_file, 'rb') as f:
+                return set(pickle.load(f))
+        except FileNotFoundError:
+            return set()
+
+    def save_devs(self):
+        with open(self.dev_file, 'wb') as f:
+            pickle.dump(self.devs, f)
+
+    def add_dev(self, dev_id):
+        self.devs.add(dev_id)
+        self.save_devs()
+
+    def dev_exists(self, dev_id):
+        return dev_id in self.devs
+
+    # Returns stored model if it exists, else creates a new one
+    def get_model(self, dev_id):
+        if dev_id in self.models:
+            print("Found model in memory")
+            return self.models[dev_id]
+
+        model = Model(dev_id)
+
+        if not self.dev_exists(dev_id):
+            print("Creating new model")
+            if os.path.exists(model.dev_model_dir):
+                shutil.rmtree(model.dev_model_dir)
+
+            if not os.path.exists(model.dev_data_dir):
+                os.makedirs(model.dev_data_dir)
+
+            self.add_dev(dev_id)
+        else:
+            print("Found model on disk")
+            model.interpreter = Interpreter.load(model.dev_model_dir, self.builder)
+        
+        self.models[dev_id] = model
+        return model
 
 
 class Model:
-    cur_pid = -1
-    dev_id = -1
-    training_data = "\0"
-    is_exist = False
-    dev_data_dir = "\0"
-    dev_model_dir = "\0"
-    new_port = -1
-
-    def __init__(self):
-        self.cur_pid = os.getpid()
-
-    def load_dev_data(self, trans_id, trans_training_data):
-        self.dev_id = trans_id
-        self.training_data = trans_training_data
-
-    def set_dev_dir(self):
+    def __init__(self, dev_id):
+        self.dev_id = dev_id
         self.dev_data_dir = "devep_data/dev_{}".format(self.dev_id)
         self.dev_model_dir = "devep_model/dev_{}".format(self.dev_id)
+        self.training_data = None
+        self.interpreter = None
 
-    def create_update_model_data(self, manager):
-        if not self.is_exist:
-            if os.path.exists(self.dev_model_dir):
-                shutil.rmtree(self.dev_model_dir)
-
-            if not os.path.exists(self.dev_data_dir):
-                os.makedirs(self.dev_data_dir)
-
-            write_file(self.dev_id, DEV_LIST_FILE)
-
-            if len(manager.port_list) == 0:
-                self.new_port = 5005
-            else:
-                self.new_port = max(manager.port_list) + 1
-
-            write_file(self.new_port, PORT_LIST_FILE)
-            write_file(self.cur_pid, PID_LIST_FILE)
-        else:
-            self.new_port = manager.dev_dict[self.dev_id]
-            pid_index = manager.dev_list.index(self.dev_id)
-            old_pid = manager.pid_list[pid_index]
-            psutil.Process(old_pid).kill()
-            kill_port(self.new_port)
-            manager.pid_list[pid_index] = self.cur_pid
-            update_pid(manager.pid_list, PID_LIST_FILE)
-
-        write_file(self.training_data,
+    def train(self, training_data):
+        # Store new training data into file (TODO: use rasa function?)
+        write_file(training_data,
                    "devep_data/dev_{}/nlu.md".format(self.dev_id))
 
-    def train_run_model(self, trans_id, trans_training_data, manager):
-        self.load_dev_data(trans_id, trans_training_data)
-        self.set_dev_dir()
-        self.create_update_model_data(manager)
+        # Train Rasa model
+        self.training_data = load_data(self.dev_data_dir)
+        trainer = Trainer(config.load(RASA_CONFIG_FILE), global_manager.builder)
+        self.interpreter = trainer.train(self.training_data)
+        model_directory = trainer.persist(self.dev_model_dir, fixed_model_name=os.path.basename(self.dev_model_dir))
 
-        # Train Rasa Model
-        training_data = load_data(self.dev_data_dir)
-        trainer = Trainer(config.load("config.yml"))
-        self.interpreter = trainer.train(training_data)
-        model_directory = trainer.persist("./models/nlu", fixed_model_name=self.dev_model_dir)
-        # TODO: catch error: "Can not train a classifier. Need at least 2 different classes. Skipping training of classifier.""
+        return self.training_data.nlu_as_json()
+    
+    def parse(self, query):
+        if self.interpreter:
+            return self.interpreter.parse(query)
+        return {}
 
 
 class Entity:
@@ -98,35 +107,34 @@ class Data:
     def __init__(self, intent, queries):
         self.intent = intent
         self.queries = queries
-        self.create_data()
 
-    def create_data(self):
+        # Format intent and queries into Rasa training data
         self.training_data = "## intent:{}\n".format(self.intent)
-        print(self.queries)
-        self.training_data += '\n'.join(map(lambda q: " - {}".format(q), self.queries))
+        self.training_data += '\n'.join(
+            map(lambda q: " - {}".format(q), self.queries))
 
+#### Flask Server ####
 
 app = Flask("Geno")
 CORS(app)
-global_manager = Manager("devep_data/dev_list.txt", "devep_data/port_list.txt", "devep_data/pid_list.txt")
-geno_model = Model()
+global_manager = Manager(DEV_LIST_FILE)
 
 
 @app.route('/train', methods=['POST'])
 def train():
-    geno_data = Data(request.json['intent'], request.json['queries'])
-    geno_model.is_exist = global_manager.dev_id_exists(geno_model.dev_id)
-    geno_model.train_run_model(request.json['dev_id'], geno_data.training_data, global_manager)
+    dev_id, intent, queries = int(request.json['dev_id']), request.json['intent'], request.json['queries']
 
-    result = {'entities': geno_model.training_data}
-    return jsonify(result)
+    geno_data = Data(intent, queries)
+    geno_model = global_manager.get_model(dev_id)
+    return geno_model.train(geno_data.training_data)
 
 
-@app.route('/response',  methods=['GET'])
+@app.route('/response', methods=['GET'])
 def response():
-    return geno_model.interpreter.parse(request.args['query'])
+    dev_id, query = int(request.args['dev_id']), request.args['query']
+    model = global_manager.get_model(dev_id)
+    return model.parse(query)
 
 
 if __name__ == '__main__':
     app.run(port=3001, debug=False)
-
