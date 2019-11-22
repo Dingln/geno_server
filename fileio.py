@@ -23,7 +23,6 @@ def load_list(filename):
     try:
         return [int(line.rstrip('\n')) for line in open(filename, 'r+')]
     except FileNotFoundError:
-        print("{} does not exist".format(filename))
         return []
 
 

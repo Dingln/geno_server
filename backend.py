@@ -9,6 +9,11 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from fileio import *
 
+from rasa.nlu.training_data import load_data
+from rasa.nlu.config import RasaNLUModelConfig
+from rasa.nlu.model import Trainer
+from rasa.nlu import config
+
 DEV_LIST_FILE = "devep_data/dev_list.txt"
 PORT_LIST_FILE = "devep_data/port_list.txt"
 PID_LIST_FILE = "devep_data/pid_list.txt"
@@ -50,9 +55,6 @@ class Model:
 
             if not os.path.exists(self.dev_data_dir):
                 os.makedirs(self.dev_data_dir)
-                # shutil.copyfile("data/stories.md",
-                #                 self.dev_data_dir + "/stories.md")
-                # shutil.copyfile("data/nlu.md", self.dev_data_dir + "/nlu.md")
 
             write_file(self.dev_id, DEV_LIST_FILE)
 
@@ -80,18 +82,12 @@ class Model:
         self.set_dev_dir()
         self.create_update_model_data(manager)
 
-        train_cmd = "cd {}; rasa train --data {} --out {}".format(os.getcwd(), self.dev_data_dir, self.dev_model_dir)
-        train_cmd_resp = os.popen(train_cmd)
-        print(train_cmd)
-        for tmp in train_cmd_resp.readlines():
-            print(tmp)
-
-        run_cmd = "cd {}; rasa run --enable-api -p {} -m {}".format(os.getcwd(), self.new_port, self.dev_model_dir)
-        print("DIRR", self.dev_model_dir)
-        run_cmd_resp = os.popen(run_cmd)
-        print(run_cmd)
-        for tmp in run_cmd_resp.readlines():
-            print(tmp)
+        # Train Rasa Model
+        training_data = load_data(self.dev_data_dir)
+        trainer = Trainer(config.load("config.yml"))
+        self.interpreter = trainer.train(training_data)
+        model_directory = trainer.persist("./models/nlu", fixed_model_name=self.dev_model_dir)
+        # TODO: catch error: "Can not train a classifier. Need at least 2 different classes. Skipping training of classifier.""
 
 
 class Entity:
@@ -99,29 +95,26 @@ class Entity:
 
 
 class Data:
-    intent = ""
-    queries = ""
-    training_data = ""
+    def __init__(self, intent, queries):
+        self.intent = intent
+        self.queries = queries
+        self.create_data()
 
     def create_data(self):
-        self.training_data = "## intent:{}".format(self.intent)
-        # for query in self.queries:
-        #     self.training_data = self.training_data + "\n - " + query
-        self.training_data = "{}\n - {}".format(self.training_data, self.queries)
+        self.training_data = "## intent:{}\n".format(self.intent)
+        print(self.queries)
+        self.training_data += '\n'.join(map(lambda q: " - {}".format(q), self.queries))
 
 
 app = Flask("Geno")
 CORS(app)
 global_manager = Manager("devep_data/dev_list.txt", "devep_data/port_list.txt", "devep_data/pid_list.txt")
 geno_model = Model()
-geno_data = Data()
 
 
 @app.route('/train', methods=['POST'])
 def train():
-    geno_data.intent = request.json['intent']
-    geno_data.queries = request.json['queries']
-    geno_data.create_data()
+    geno_data = Data(request.json['intent'], request.json['queries'])
     geno_model.is_exist = global_manager.dev_id_exists(geno_model.dev_id)
     geno_model.train_run_model(request.json['dev_id'], geno_data.training_data, global_manager)
 
@@ -131,10 +124,7 @@ def train():
 
 @app.route('/response',  methods=['GET'])
 def response():
-    post_url = "http://localhost:{}/model/parse".format(geno_model.new_port)
-    data = json.dumps(dict(text=request.args['query']))
-    resp = requests.post(post_url, data)
-    return resp.content
+    return geno_model.interpreter.parse(request.args['query'])
 
 
 if __name__ == '__main__':
