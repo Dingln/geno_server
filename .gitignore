@@ -1,0 +1,6 @@
+devep_model/
+devep_data/
+models/
+
+__pycache__/
+.DS_Store

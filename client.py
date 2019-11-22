@@ -1,11 +1,20 @@
 import requests
+import sys
 
-json_data = {'dev_id': "1",
-             'intent': "check_balance",
-             'queries': "what is my balance"
-             }
+if len(sys.argv) < 2:
+    print("Usage: python3 client.py [train/response]")
+    exit()
 
-r = requests.post("http://127.0.0.1:3001/train", json=json_data)
+if sys.argv[1] == "train":
+    json_data = {
+        'dev_id': "1",
+        'intent': "check_balance",
+        'queries': "what is my balance"
+    }
+    res = requests.post("http://127.0.0.1:3001/train", json=json_data)
+elif sys.argv[1] == "response":
+    res = requests.get("http://127.0.0.1:3001/response")
 
-print(r.headers)
-print(r.text)
+print(res.headers)
+print(res.text)
+
