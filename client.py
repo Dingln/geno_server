@@ -1,3 +1,4 @@
+import pprint
 import requests
 import sys
 
@@ -5,14 +6,14 @@ import sys
 def train(*data):
     res = []
     for json in data:
-        res.append(requests.post("http://127.0.0.1:3001/train", json=json).text)
+        res.append(requests.post("http://127.0.0.1:3001/intent/train", json=json).json())
        
     return res
 
 def response(dev_id, query):
     payload = {'dev_id': dev_id, 'query': query}
     res = requests.get("http://127.0.0.1:3001/response", params=payload)
-    return res.text
+    return res.json()
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -27,7 +28,7 @@ if __name__ == "__main__":
             print(train({
                     'dev_id': 1,
                     'intent': "multiply_numbers",
-                    'queries': ["what is the product of two and four", "multiply six and ten", "product of fourteen and twelve", "whats the product of thirty and eleven"]
+                    'queries': ["what is the product of two and four", "multiply six and ten", "product of fourteen and twelve", "whats the product of thirty and eleven", "how much is six times ten"]
                 },
                 {
                     'dev_id': 1,

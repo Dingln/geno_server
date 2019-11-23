@@ -6,6 +6,7 @@ import requests
 import shutil
 import sys
 
+from contextlib import contextmanager
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
@@ -23,9 +24,8 @@ class Manager:
     def __init__(self, dev_file):
         self.dev_file = dev_file
         self.devs = self.load_devs()
-        self.models = {}  # Empty, lazy load pre-existing models in get_model
-        
-        # Cache components between pipelines (where possible)
+        self.models = {}  # Lazy load pre-existing models in get_model
+        # Cache components between pipelines
         self.builder = ComponentBuilder(use_cache=True)
 
     def load_devs(self):
@@ -65,8 +65,9 @@ class Manager:
             self.add_dev(dev_id)
         else:
             print("Found model on disk")
-            model.interpreter = Interpreter.load(model.dev_model_dir, self.builder)
-        
+            model.interpreter = Interpreter.load(
+                model.dev_model_dir, self.builder)
+
         self.models[dev_id] = model
         return model
 
@@ -76,27 +77,81 @@ class Model:
         self.dev_id = dev_id
         self.dev_data_dir = "devep_data/dev_{}".format(self.dev_id)
         self.dev_model_dir = "devep_model/dev_{}".format(self.dev_id)
-        self.dev_train_file = "devep_data/dev_{}/nlu.md".format(self.dev_id)
+        self.dev_train_file = "devep_data/dev_{}/nlu.json".format(self.dev_id)
         self.training_data = None
         self.interpreter = None
 
-    def train(self, training_data):
-        # Store new training data into file (TODO: use rasa function?)
-        with open(self.dev_train_file, 'a+') as f:
-            f.write(training_data)
+    def train(self, common_examples):
+        # Store new training data into file
+        self.update_data(common_examples)
 
         # Train Rasa model
         self.training_data = load_data(self.dev_data_dir)
-        trainer = Trainer(config.load(RASA_CONFIG_FILE), global_manager.builder)
+        trainer = Trainer(config.load(RASA_CONFIG_FILE),
+                          global_manager.builder)
         self.interpreter = trainer.train(self.training_data)
-        model_directory = trainer.persist(self.dev_model_dir, fixed_model_name=os.path.basename(self.dev_model_dir))
+        model_directory = trainer.persist(self.dev_model_dir)
 
         return self.training_data.nlu_as_json()
-    
+
     def parse(self, query):
         if self.interpreter:
             return self.interpreter.parse(query)
         return {}
+
+    @contextmanager
+    def common_examples(self, default=[]):
+        data = {}
+        try:
+            with open(self.dev_train_file, 'r+') as f:
+                data = json.load(f)
+                examples = data['rasa_nlu_data']['common_examples']
+                yield examples
+
+            data['rasa_nlu_data']['common_examples'] = examples
+        except (FileNotFoundError, json.JSONDecodeError):
+            data = {
+                "rasa_nlu_data": {
+                    "common_examples": default,
+                    "regex_features": [],
+                    "lookup_tables": [],
+                    "entity_synonyms": []
+                }
+            }
+            yield default
+        finally:
+            with open(self.dev_train_file, 'w+') as f:
+                json.dump(data, f)
+
+    def update_data(self, new_examples):
+        # FIXME: Searching for duplicates is inefficient
+        with self.common_examples(new_examples) as examples:
+            for ex in new_examples:
+                if ex not in examples:
+                    examples.append(ex)
+
+            return examples
+
+    def delete_intent(self, intent):
+         with self.common_examples() as examples:
+            examples = list(filter(lambda x: x['intent'] != intent, examples))
+            return examples
+
+    def update_query(self, intent, old_query, new_query):
+        with self.common_examples() as examples:
+            for (i, example) in enumerate(examples):
+                if example['intent'] == intent and example['query'] == old_query:
+                    examples[i]['query'] = new_query
+
+            return examples
+
+    def delete_query(self, intent, query):
+       with self.common_examples() as examples:
+            for (i, example) in enumerate(examples):
+                if example['intent'] == intent and example['query'] == old_query:
+                    examples.pop(i)
+
+            return examples
 
 
 class Entity:
@@ -109,24 +164,32 @@ class Data:
         self.queries = queries
 
         # Format intent and queries into Rasa training data
-        self.training_data = "## intent:{}\n".format(self.intent)
-        self.training_data += '\n'.join(
-            map(lambda q: " - {}".format(q), self.queries))
+        self.training_data = [{"intent": intent, "text": query}
+                              for query in queries]
 
 #### Flask Server ####
+
 
 app = Flask("Geno")
 CORS(app)
 global_manager = Manager(DEV_LIST_FILE)
 
 
-@app.route('/train', methods=['POST'])
+@app.route('/intent/train', methods=['POST'])
 def train():
-    dev_id, intent, queries = int(request.json['dev_id']), request.json['intent'], request.json['queries']
+    dev_id, intent, queries = int(
+        request.json['dev_id']), request.json['intent'], request.json['queries']
 
     geno_data = Data(intent, queries)
     geno_model = global_manager.get_model(dev_id)
     return geno_model.train(geno_data.training_data)
+
+
+@app.route('/intent/delete', methods=['POST'])
+def delete_intent():
+    dev_id, intent = int(request.args['dev_id']), request.args['intent']
+    model = global_manager.get_model(dev_id)
+    return jsonify(model.delete_intent(intent))
 
 
 @app.route('/response', methods=['GET'])
@@ -136,5 +199,21 @@ def response():
     return model.parse(query)
 
 
+@app.route('/query/update', methods=['POST'])
+def update_query():
+    dev_id, intent, old_query, new_query = int(
+        request.json['dev_id']), request.json['intent'], request.json['old_query'], request.json['new_query']
+    model = global_manager.get_model(dev_id)
+    return jsonify(model.update_query(intent, old_query, new_query))
+
+
+@app.route('/query/delete', methods=['POST'])
+def delete_query():
+    dev_id, intent, query = int(
+        request.json['dev_id']), request.json['intent'], request.json['query']
+    model = global_manager.get_model(dev_id)
+    return jsonify(model.delete_query(intent, query))
+
+
 if __name__ == '__main__':
-    app.run(port=3001, debug=False)
+    app.run(port=3001, debug=False, threaded=True)
