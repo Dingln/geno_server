@@ -52,5 +52,5 @@ if __name__ == "__main__":
         if dev_id == 1:
             print(response(1, "the product of twenty and sixteen"))
         elif dev_id == 2:
-            print(response(2, "whats the weather in atlanta"))
+            print(response(2, "whats the weather in Atlanta"))
 

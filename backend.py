@@ -5,6 +5,7 @@ import psutil
 import requests
 import shutil
 import sys
+import spacy
 
 from contextlib import contextmanager
 from flask import Flask, request, jsonify
@@ -95,8 +96,22 @@ class Model:
         return self.training_data.nlu_as_json()
 
     def parse(self, query):
+        # Do entity Recognition using Spacy
+        ner_doc = ner_spacy(query)
+        ners = []
+        for ent in ner_doc.ents:
+            ent_dict = {
+                'text': ent.text,
+                'start': ent.start_char,
+                'end': ent.end_char,
+                'label': ent.label_
+            }
+            ners.append(ent_dict)
+
         if self.interpreter:
-            return self.interpreter.parse(query)
+            res = self.interpreter.parse(query)
+            res['entities'] = ners
+            return res
         return {}
 
     @contextmanager
@@ -216,4 +231,5 @@ def delete_query():
 
 
 if __name__ == '__main__':
+    ner_spacy = spacy.load("en")
     app.run(port=3001, debug=False, threaded=True)
