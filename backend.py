@@ -91,7 +91,7 @@ class Model:
         trainer = Trainer(config.load(RASA_CONFIG_FILE),
                           global_manager.builder)
         self.interpreter = trainer.train(self.training_data)
-        model_directory = trainer.persist(self.dev_model_dir)
+        model_directory = trainer.persist("devep_model", fixed_model_name=os.path.basename(self.dev_model_dir))
 
         return self.training_data.nlu_as_json()
 
@@ -148,25 +148,29 @@ class Model:
             return examples
 
     def delete_intent(self, intent):
-         with self.common_examples() as examples:
-            examples = list(filter(lambda x: x['intent'] != intent, examples))
+        with self.common_examples() as examples:
+            examples[:] = [x for x in examples if x['intent'] != intent]
             return examples
 
     def update_query(self, intent, old_query, new_query):
         with self.common_examples() as examples:
+            return_query = None
             for (i, example) in enumerate(examples):
-                if example['intent'] == intent and example['query'] == old_query:
-                    examples[i]['query'] = new_query
+                if example['intent'] == intent and example['text'] == old_query:
+                    examples[i]['text'] = new_query
+                    return_query = example
+                    break
 
-            return examples
+            # TODO: analyze query entities
+            if return_query:
+                return_query['entities'] = []
+
+            return return_query 
 
     def delete_query(self, intent, query):
        with self.common_examples() as examples:
-            for (i, example) in enumerate(examples):
-                if example['intent'] == intent and example['query'] == old_query:
-                    examples.pop(i)
-
-            return examples
+           examples[:] = [x for x in examples if x['intent'] != intent or x['text'] != query]
+           return examples
 
 
 class Entity:
@@ -202,7 +206,7 @@ def train():
 
 @app.route('/intent/delete', methods=['POST'])
 def delete_intent():
-    dev_id, intent = int(request.args['dev_id']), request.args['intent']
+    dev_id, intent = int(request.json['dev_id']), request.json['intent']
     model = global_manager.get_model(dev_id)
     return jsonify(model.delete_intent(intent))
 
