@@ -150,6 +150,7 @@ class Model:
     def delete_intent(self, intent):
         with self.common_examples() as examples:
             examples[:] = [x for x in examples if x['intent'] != intent]
+            self.train(examples) # Retrain model to remove intent
             return examples
 
     def update_query(self, intent, old_query, new_query):
