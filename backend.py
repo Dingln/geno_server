@@ -96,21 +96,11 @@ class Model:
         return self.training_data.nlu_as_json()
 
     def parse(self, query):
-        # Do entity Recognition using Spacy
-        ner_doc = ner_spacy(query)
-        ners = []
-        for ent in ner_doc.ents:
-            ent_dict = {
-                'text': ent.text,
-                'start': ent.start_char,
-                'end': ent.end_char,
-                'label': ent.label_
-            }
-            ners.append(ent_dict)
+        ners = pretrained_entities.run_spacy(query)
 
         if self.interpreter:
             res = self.interpreter.parse(query)
-            res['entities'] = ners
+            # res['entities'] = ners
             return res
         return {}
 
@@ -174,18 +164,43 @@ class Model:
            return examples
 
 
-class Entity:
-    queries = []
+class EntityRecognition:
+    ner_spacy = None
+
+    def __init__(self):
+        self.ner_spacy = spacy.load("en")
+    
+    def run_spacy(self, query):
+        ner_doc = self.ner_spacy(query)
+        ners = []
+        for ent in ner_doc.ents:
+            ent_dict = {
+                'text': ent.text,
+                'start': ent.start_char,
+                'end': ent.end_char,
+                'entity': ent.label_
+            }
+            ners.append(ent_dict)
+        return ners
 
 
 class Data:
-    def __init__(self, intent, queries):
+    def __init__(self, intent, queries, parameters):
         self.intent = intent
         self.queries = queries
+        self.parameters = parameters
 
         # Format intent and queries into Rasa training data
-        self.training_data = [{"intent": intent, "text": query}
-                              for query in queries]
+        self.training_data = [{"intent": intent, "text": query, "entities": pretrained_entities.run_spacy(query)}
+                              for query in queries] 
+        # Assign parameters to label of entities
+        if self.parameters:
+            for item in self.training_data:
+                min_len = min(len(self.parameters), len(item['entities']))
+                for idx in range(min_len):
+                    item['entities'][idx]['entity'] = self.parameters[idx]
+            
+
 
 #### Flask Server ####
 
@@ -193,14 +208,15 @@ class Data:
 app = Flask("Geno")
 CORS(app)
 global_manager = Manager(DEV_LIST_FILE)
+pretrained_entities = EntityRecognition()
 
 
 @app.route('/intent/train', methods=['POST'])
 def train():
-    dev_id, intent, queries = int(
-        request.json['dev_id']), request.json['intent'], request.json['queries']
+    dev_id, intent, queries, parameters = int(
+        request.json['dev_id']), request.json['intent'], request.json['queries'], request.json['parameters']
 
-    geno_data = Data(intent, queries)
+    geno_data = Data(intent, queries, parameters)
     geno_model = global_manager.get_model(dev_id)
     return geno_model.train(geno_data.training_data)
 
@@ -236,5 +252,4 @@ def delete_query():
 
 
 if __name__ == '__main__':
-    ner_spacy = spacy.load("en")
     app.run(port=3001, debug=False, threaded=True)
