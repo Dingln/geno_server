@@ -1,0 +1,7 @@
+devep_model/
+devep_data/
+models/
+
+__pycache__/
+.vscode/
+.DS_Store

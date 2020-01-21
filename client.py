@@ -1,16 +1,60 @@
+import pprint
 import requests
+import sys
 
-json_data = {'dev_id': "1",
-             'intent': "check_balance",
-             'queries': "what is my balance"
-             }
 
-r = requests.post("http://127.0.0.1:5000/train", json=json_data)
+def train(*data):
+    res = []
+    for json in data:
+        res.append(requests.post("http://127.0.0.1:3001/intent/train", json=json).json())
+       
+    return res
 
-print(r.headers)
-print(r.text)
+def response(dev_id, query):
+    payload = {'dev_id': dev_id, 'query': query}
+    res = requests.get("http://127.0.0.1:3001/response", params=payload)
+    return res.json()
 
-res = requests.get("http://127.0.0.1:5000/test", json=json_data)
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python3 client.py [train/response]")
+        exit()
 
-print(res.headers)
-print(res.text)
+    endpoint = sys.argv[1]
+    dev_id = int(sys.argv[2])
+
+    if endpoint == "train":
+        if dev_id == 1:
+            print(train({
+                    'dev_id': 1,
+                    'intent': "multiply_numbers",
+                    'parameters': ["num1", "num2"],
+                    'queries': ["what is the product of two and four", "multiply six and ten", "product of fourteen and twelve", "whats the product of thirty and eleven", "how much is six times ten"]
+                },
+                {
+                    'dev_id': 1,
+                    'intent': "check_balance",
+                    'parameters': ["account"],
+                    'queries': ["how much money is in my checking account", "what is the balance of my checking account", "how much money in my savings account", "what is the balance of my savings account"]
+                }
+            ))
+        elif dev_id == 2:
+            print(train({
+                    'dev_id': 2,
+                    'intent': "introduction",
+                    'parameters': ["name"],
+                    'queries': ["hi my name is Joe", "hello I'm Bob", "hi i'm John", "hey my name is Andrew"]
+                },
+                {
+                    'dev_id': 2,
+                    'intent': "check_weather",
+                    'parameters': ["loaction1", "loaction2"],
+                    'queries': ["what is the weather in Tokyo and Shanghai", "whats the weather like in London"]
+                }
+            ))
+    elif endpoint == "response":
+        if dev_id == 1:
+            print(response(1, "the product of twenty and sixteen"))
+        elif dev_id == 2:
+            print(response(2, "whats the weather in Seattle"))
+
