@@ -15,6 +15,13 @@ def response(dev_id, query):
     res = requests.get("http://127.0.0.1:3001/response", params=payload)
     return res.json()
 
+
+def update(*data):
+    res = []
+    for json in data:
+        res.append(requests.post("http://127.0.0.1:3001/query/update", json=json).json())
+    return res
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python3 client.py [train/response]")
@@ -28,7 +35,7 @@ if __name__ == "__main__":
             print(train({
                     'dev_id': 1,
                     'intent': "multiply_numbers",
-                    'parameters': ["num1", "num2"],
+                    'parameters': {},
                     'queries': ["what is the product of two and four", "multiply six and ten", "product of fourteen and twelve", "whats the product of thirty and eleven", "how much is six times ten"]
                 },
                 {
@@ -48,7 +55,7 @@ if __name__ == "__main__":
                 {
                     'dev_id': 2,
                     'intent': "check_weather",
-                    'parameters': ["loaction1", "loaction2"],
+                    'parameters': {},
                     'queries': ["what is the weather in Tokyo and Shanghai", "whats the weather like in London"]
                 }
             ))
@@ -57,4 +64,17 @@ if __name__ == "__main__":
             print(response(1, "the product of twenty and sixteen"))
         elif dev_id == 2:
             print(response(2, "whats the weather in Seattle"))
+
+    elif endpoint == "update":
+        if dev_id == 2:
+            print(update(
+                {
+                    'dev_id': 2,
+                    'intent': "check_weather",
+                    'parameters': [{'label': 'location', 'start': 22, 'end': 32}],
+                    'old_query': "what is the weather in Tokyo and Shanghai",
+                    'new_query': "How is the weather in Los Angeles"
+                }
+            ))
+
 

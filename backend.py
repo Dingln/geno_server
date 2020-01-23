@@ -100,7 +100,7 @@ class Model:
 
         if self.interpreter:
             res = self.interpreter.parse(query)
-            # res['entities'] = ners
+            res['entities'] = ners
             return res
         return {}
 
@@ -143,18 +143,19 @@ class Model:
             self.train(examples) # Retrain model to remove intent
             return examples
 
-    def update_query(self, intent, old_query, new_query):
+    def update_query(self, intent, old_query, new_query, parameters):
         with self.common_examples() as examples:
             return_query = None
             for (i, example) in enumerate(examples):
                 if example['intent'] == intent and example['text'] == old_query:
                     examples[i]['text'] = new_query
+                    examples[i]['entities'] = pretrained_entities.self_choose(new_query, parameters)
                     return_query = example
                     break
 
             # TODO: analyze query entities
-            if return_query:
-                return_query['entities'] = []
+            # if return_query:
+            #     return_query['entities'] = []
 
             return return_query 
 
@@ -183,6 +184,18 @@ class EntityRecognition:
             ners.append(ent_dict)
         return ners
 
+    def self_choose(self, query, parameters):
+        ners = []
+        for para in parameters:
+            ent_dict = {
+                'text': query[para['start']:para['end']+1],
+                'start': para['start'],
+                'end': para['end'],
+                'entity': para['label']
+            }
+            ners.append(ent_dict)
+        return ners
+
 
 class Data:
     def __init__(self, intent, queries, parameters):
@@ -191,7 +204,9 @@ class Data:
         self.parameters = parameters
 
         # Format intent and queries into Rasa training data
-        self.training_data = [{"intent": intent, "text": query, "entities": pretrained_entities.run_spacy(query)}
+        # self.training_data = [{"intent": intent, "text": query, "entities": pretrained_entities.run_spacy(query)}
+        #                       for query in queries] 
+        self.training_data = [{"intent": intent, "text": query, "entities": []}
                               for query in queries] 
         # Assign parameters to label of entities
         if self.parameters:
@@ -237,10 +252,10 @@ def response():
 
 @app.route('/query/update', methods=['POST'])
 def update_query():
-    dev_id, intent, old_query, new_query = int(
-        request.json['dev_id']), request.json['intent'], request.json['old_query'], request.json['new_query']
+    dev_id, intent, old_query, new_query, parameters = int(
+        request.json['dev_id']), request.json['intent'], request.json['old_query'], request.json['new_query'], request.json['parameters']
     model = global_manager.get_model(dev_id)
-    return jsonify(model.update_query(intent, old_query, new_query))
+    return jsonify(model.update_query(intent, old_query, new_query, parameters))
 
 
 @app.route('/query/delete', methods=['POST'])
