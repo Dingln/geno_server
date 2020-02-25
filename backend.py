@@ -96,11 +96,11 @@ class Model:
         return self.training_data.nlu_as_json()
 
     def parse(self, query):
-        ners = pretrained_entities.run_spacy(query)
+        # ners = pretrained_entities.run_spacy(query)
 
         if self.interpreter:
             res = self.interpreter.parse(query)
-            res['entities'] = ners
+            # res['entities'] = ners
             return res
         return {}
 
@@ -196,6 +196,18 @@ class EntityRecognition:
             ners.append(ent_dict)
         return ners
 
+    def self_choose_single(self, query, parameters):
+        ners = []
+        for para in parameters:
+            ent_dict = {
+                'text': query[para['start']:para['end']],
+                'start': para['start'],
+                'end': para['end'],
+                'entity': para['label']
+            }
+            ners.append(ent_dict)
+        return ners
+
 
 class Data:
     def __init__(self, intent, queries, parameters):
@@ -204,16 +216,18 @@ class Data:
         self.parameters = parameters
 
         # Format intent and queries into Rasa training data
+        self.training_data = [{"intent": intent, "text": queries[i], "entities": pretrained_entities.self_choose_single(queries[i], parameters[i])}
+                              for i in range(len(queries))] 
         # self.training_data = [{"intent": intent, "text": query, "entities": pretrained_entities.run_spacy(query)}
+                            #   for query in queries] 
+        # self.training_data = [{"intent": intent, "text": query, "entities": []}
         #                       for query in queries] 
-        self.training_data = [{"intent": intent, "text": query, "entities": []}
-                              for query in queries] 
         # Assign parameters to label of entities
-        if self.parameters:
-            for item in self.training_data:
-                min_len = min(len(self.parameters), len(item['entities']))
-                for idx in range(min_len):
-                    item['entities'][idx]['entity'] = self.parameters[idx]
+        # if self.parameters:
+        #     for item in self.training_data:
+        #         min_len = min(len(self.parameters), len(item['entities']))
+        #         for idx in range(min_len):
+        #             item['entities'][idx]['entity'] = self.parameters[idx]
             
 
 

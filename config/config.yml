@@ -1,7 +1,35 @@
 # Configuration for Rasa NLU.
 # https://rasa.com/docs/rasa/nlu/components/
 language: en
-pipeline: supervised_embeddings
+# pipeline: supervised_embeddings
+pipeline:
+- name: "MitieNLP"
+  model: "/Users/yunpengding/Downloads/MITIE-models/english/total_word_feature_extractor.dat"
+# - name: "SpacyNLP"
+- name: "WhitespaceTokenizer"
+- name: "MitieTokenizer"
+- name: "MitieEntityExtractor"
+- name: "RegexFeaturizer"
+# - name: "CRFEntityExtractor"
+- name: "MitieEntityExtractor"
+# - name: "SpacyEntityExtractor"
+- name: "EntitySynonymMapper"
+- name: "CountVectorsFeaturizer"
+- name: "CountVectorsFeaturizer"
+  analyzer: "char_wb"
+  min_ngram: 1
+  max_ngram: 4
+- name: "EmbeddingIntentClassifier"
+
+# pipeline:
+# - name: "MitieNLP"
+#   model: "/Users/yunpengding/Downloads/MITIE-models/english/total_word_feature_extractor.dat"
+# - name: "MitieTokenizer"
+# - name: "MitieEntityExtractor"
+# - name: "EntitySynonymMapper"
+# - name: "RegexFeaturizer"
+# - name: "MitieFeaturizer"
+# - name: "SklearnIntentClassifier"
 
 # Configuration for Rasa Core.
 # https://rasa.com/docs/rasa/core/policies/

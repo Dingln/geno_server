@@ -49,21 +49,34 @@ if __name__ == "__main__":
             print(train({
                     'dev_id': 2,
                     'intent': "introduction",
-                    'parameters': ["name"],
+                    'parameters': [[], [], [], []],
                     'queries': ["hi my name is Joe", "hello I'm Bob", "hi i'm John", "hey my name is Andrew"]
                 },
                 {
                     'dev_id': 2,
                     'intent': "check_weather",
-                    'parameters': {},
+                    'parameters': [
+                                [{'start': 23, 'end': 28, 'label': "location1"}, {'start': 33, 'end': 41, 'label': "location2"}],
+                                [{'label': "location1", 'start': 26, 'end': 32}]
+                                ], 
                     'queries': ["what is the weather in Tokyo and Shanghai", "whats the weather like in London"]
-                }
+                },
+                {
+                    'dev_id': 2,
+                    'intent': "change_color",
+                    'parameters': [
+                                [{'start': 16, 'end': 19, 'label': "color"}],
+                                [{'label': "color", 'start': 21, 'end': 25}]
+                                ], 
+                    'queries': ["change color to red", "change text color to blue"]
+                },
+
             ))
     elif endpoint == "response":
         if dev_id == 1:
             print(response(1, "the product of twenty and sixteen"))
         elif dev_id == 2:
-            print(response(2, "whats the weather in Seattle"))
+            print(response(2, "change the color to orange"))
 
     elif endpoint == "update":
         if dev_id == 2:
@@ -71,9 +84,9 @@ if __name__ == "__main__":
                 {
                     'dev_id': 2,
                     'intent': "check_weather",
-                    'parameters': [{'label': 'location', 'start': 22, 'end': 32}],
+                    'parameters': [{'label': 'location1', 'start': 23, 'end': 27}, {'label': 'location2', 'start': 33, 'end': 41}],
                     'old_query': "what is the weather in Tokyo and Shanghai",
-                    'new_query': "How is the weather in Los Angeles"
+                    'new_query': "what is the weather in Tokyo and Shanghai"
                 }
             ))
 
