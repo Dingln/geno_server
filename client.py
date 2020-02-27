@@ -46,29 +46,50 @@ if __name__ == "__main__":
                 }
             ))
         elif dev_id == 2:
-            print(train({
-                    'dev_id': 2,
-                    'intent': "introduction",
-                    'parameters': [[], [], [], []],
-                    'queries': ["hi my name is Joe", "hello I'm Bob", "hi i'm John", "hey my name is Andrew"]
-                },
-                {
-                    'dev_id': 2,
-                    'intent': "check_weather",
-                    'parameters': [
-                                [{'start': 23, 'end': 28, 'label': "location1"}, {'start': 33, 'end': 41, 'label': "location2"}],
-                                [{'label': "location1", 'start': 26, 'end': 32}]
-                                ], 
-                    'queries': ["what is the weather in Tokyo and Shanghai", "whats the weather like in London"]
-                },
+            print(train(
+                # {
+                #     'dev_id': 2,
+                #     'intent': "introduction",
+                #     'parameters': [[], [], [], []],
+                #     'queries': ["hi my name is Joe", "hello I'm Bob", "hi i'm John", "hey my name is Andrew"]
+                # },
+                # {
+                #     'dev_id': 2,
+                #     'intent': "check_weather",
+                #     'parameters': [ 'location 1', 'location 2'
+                #                 # [{'start': 23, 'end': 28, 'label': "location1"}, {'start': 33, 'end': 41, 'label': "location2"}],
+                #                 # [{'label': "location1", 'start': 26, 'end': 32}]
+                #                 ], 
+                #     'queries': ["what is the weather in Tokyo and Shanghai", "whats the weather like in London"]
+                # },
                 {
                     'dev_id': 2,
                     'intent': "change_color",
-                    'parameters': [
-                                [{'start': 16, 'end': 19, 'label': "color"}],
-                                [{'label': "color", 'start': 21, 'end': 25}]
+                    'parameters': [ 'color'
+                                # [{'start': 16, 'end': 19, 'label': "color"}],
+                                # [{'label': "color", 'start': 21, 'end': 25}]
                                 ], 
-                    'queries': ["change color to red", "change text color to blue"]
+                    'queries': [
+                        {   'text': "Change color to blue",
+                            'entities': {
+                                '0': { 'label': None, 'text': "Change", 'start': 0, 'end': 6 }, 
+                                '7': { 'label': None, 'text': "color", 'start': 7, 'end': 12 }, 
+                                '13': { 'label': None, 'text': "to", 'start': 7, 'end': 15 }, 
+                                '16': { 'label': "color", 'text': "blue", 'start': 16, 'end': 20 }, 
+                            },
+                            'id': 2
+                        },
+                        {   'text': "Change text color to red",
+                            'entities': {
+                                '0': { 'label': None, 'text': "Change", 'start': 0, 'end': 6 }, 
+                                '7': { 'label': None, 'text': "text", 'start': 7, 'end': 11 }, 
+                                '12': { 'label': None, 'text': "color", 'start': 7, 'end': 17 }, 
+                                '18': { 'label': None, 'text': "to", 'start': 18, 'end': 20 }, 
+                                '21': { 'label': "color", 'text': "red", 'start': 21, 'end': 24 }, 
+                            },
+                            'id': 2
+                        }
+                    ]
                 },
 
             ))

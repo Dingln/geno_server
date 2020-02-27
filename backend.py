@@ -168,10 +168,17 @@ class Model:
 class EntityRecognition:
     ner_spacy = None
 
-    def __init__(self):
-        self.ner_spacy = spacy.load("en")
+    def __init__(self, use_spacy=True):
+        if use_spacy:
+            self.ner_spacy = spacy.load("en")
+        else:
+            self.ner_spacy = None
+        pass
     
     def run_spacy(self, query):
+        if self.ner_spacy == None:
+            print('Spacy should be set to USE')
+            return
         ner_doc = self.ner_spacy(query)
         ners = []
         for ent in ner_doc.ents:
@@ -196,16 +203,20 @@ class EntityRecognition:
             ners.append(ent_dict)
         return ners
 
-    def self_choose_single(self, query, parameters):
+    def self_choose_single(self, query):
         ners = []
-        for para in parameters:
-            ent_dict = {
-                'text': query[para['start']:para['end']],
-                'start': para['start'],
-                'end': para['end'],
-                'entity': para['label']
-            }
-            ners.append(ent_dict)
+        for entity in query['entities'].values():
+            if entity['label'] is not None:
+                entity['entity'] = entity.pop('label')
+                ners.append(entity)
+        # for para in parameters:
+        #     ent_dict = {
+        #         'text': query[para['start']:para['end']],
+        #         'start': para['start'],
+        #         'end': para['end'],
+        #         'entity': para['label']
+        #     }
+        #     ners.append(ent_dict)
         return ners
 
 
@@ -216,7 +227,8 @@ class Data:
         self.parameters = parameters
 
         # Format intent and queries into Rasa training data
-        self.training_data = [{"intent": intent, "text": queries[i], "entities": pretrained_entities.self_choose_single(queries[i], parameters[i])}
+        self.queries = map(lambda q: q['text'], queries)
+        self.training_data = [{"intent": intent, "text": queries[i]['text'], "entities": pretrained_entities.self_choose_single(queries[i])}
                               for i in range(len(queries))] 
         # self.training_data = [{"intent": intent, "text": query, "entities": pretrained_entities.run_spacy(query)}
                             #   for query in queries] 
@@ -237,7 +249,7 @@ class Data:
 app = Flask("Geno")
 CORS(app)
 global_manager = Manager(DEV_LIST_FILE)
-pretrained_entities = EntityRecognition()
+pretrained_entities = EntityRecognition(use_spacy=False)
 
 
 @app.route('/intent/train', methods=['POST'])

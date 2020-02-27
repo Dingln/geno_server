@@ -3,15 +3,15 @@
 language: en
 # pipeline: supervised_embeddings
 pipeline:
-- name: "MitieNLP"
-  model: "/Users/yunpengding/Downloads/MITIE-models/english/total_word_feature_extractor.dat"
+# - name: "MitieNLP"
+  # model: "/Users/yunpengding/Downloads/MITIE-models/english/total_word_feature_extractor.dat"
 # - name: "SpacyNLP"
 - name: "WhitespaceTokenizer"
-- name: "MitieTokenizer"
-- name: "MitieEntityExtractor"
+# - name: "MitieTokenizer"
+# - name: "MitieEntityExtractor"
 - name: "RegexFeaturizer"
-# - name: "CRFEntityExtractor"
-- name: "MitieEntityExtractor"
+- name: "CRFEntityExtractor"
+# - name: "MitieEntityExtractor"
 # - name: "SpacyEntityExtractor"
 - name: "EntitySynonymMapper"
 - name: "CountVectorsFeaturizer"
