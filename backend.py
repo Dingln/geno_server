@@ -101,6 +101,9 @@ class Model:
         if self.interpreter:
             res = self.interpreter.parse(query)
             # res['entities'] = ners
+            for ent in res['entities']:
+                if multiple_mode.check_words(ent['value']) == False:
+                    res['entities'].remove(ent)
             return res
         return {}
 
@@ -149,7 +152,7 @@ class Model:
             for (i, example) in enumerate(examples):
                 if example['intent'] == intent and example['text'] == old_query:
                     examples[i]['text'] = new_query
-                    examples[i]['entities'] = pretrained_entities.self_choose(new_query, parameters)
+                    examples[i]['entities'] = pretrained_entities.self_choose_single(new_query)
                     return_query = example
                     break
 
@@ -240,6 +243,19 @@ class Data:
         #         min_len = min(len(self.parameters), len(item['entities']))
         #         for idx in range(min_len):
         #             item['entities'][idx]['entity'] = self.parameters[idx]
+
+
+class Multimodal:
+    activation_words = None
+    def __init__(self):
+        self.activation_words = ['this', 'that', 'here', 'there']
+    
+    def check_words(self, entity):
+        for word in self.activation_words:
+            if word in entity:
+                return False
+        return True
+
             
 
 
@@ -250,6 +266,7 @@ app = Flask("Geno")
 CORS(app)
 global_manager = Manager(DEV_LIST_FILE)
 pretrained_entities = EntityRecognition(use_spacy=False)
+multiple_mode = Multimodal()
 
 
 @app.route('/intent/train', methods=['POST'])
