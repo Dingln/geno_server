@@ -32,4 +32,6 @@ Assuming Python 3 is installed, and you've navigated to this directory via the c
     python backend.py
     ```
 
-The server shoud now be running on http://127.0.0.1:3001. Leave it running so Geno to communicate with it.
+The server shoud now be running on http://127.0.0.1:3001. Leave it running so Geno can communicate with it.
+
+If you'd like to delete generated models in the database, run the `clear.sh` script.
