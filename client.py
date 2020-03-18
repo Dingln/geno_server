@@ -74,7 +74,7 @@ if __name__ == "__main__":
                             'entities': {
                                 '0': { 'label': None, 'text': "Change", 'start': 0, 'end': 6 }, 
                                 '7': { 'label': None, 'text': "color", 'start': 7, 'end': 12 }, 
-                                '13': { 'label': None, 'text': "to", 'start': 7, 'end': 15 }, 
+                                '13': { 'label': "color", 'text': "to", 'start': 13, 'end': 15 }, 
                                 '16': { 'label': "color", 'text': "blue", 'start': 16, 'end': 20 }, 
                             },
                             'id': 2
