@@ -104,6 +104,10 @@ class Model:
             for ent in res['entities']:
                 if multiple_mode.check_words(ent['value']) == False:
                     res['entities'].remove(ent)
+                if ent['value'] == 'None':
+                    start = ent['start']
+                    end = ent['end']
+                    ent['value'] = query[start:end]
             return res
         return {}
 
@@ -208,10 +212,17 @@ class EntityRecognition:
 
     def self_choose_single(self, query):
         ners = []
+        pre_entity = None
         for entity in query['entities'].values():
             if entity['label'] is not None:
-                entity['entity'] = entity.pop('label')
-                ners.append(entity)
+                if pre_entity != None and entity['label'] == pre_entity['entity']:
+                    print(pre_entity)
+                    pre_entity['end'] = entity['end']
+                    pre_entity['text'] = query['text'][pre_entity['start']:pre_entity['end']]
+                else:
+                    entity['entity'] = entity.pop('label')
+                    ners.append(entity)
+                    pre_entity = entity
         # for para in parameters:
         #     ent_dict = {
         #         'text': query[para['start']:para['end']],
@@ -271,8 +282,17 @@ multiple_mode = Multimodal()
 
 @app.route('/intent/train', methods=['POST'])
 def train():
-    dev_id, intent, queries, parameters = int(
-        request.json['dev_id']), request.json['intent'], request.json['queries'], request.json['parameters']
+    try:
+        dev_id, intent, queries, parameters = int(
+            request.json['dev_id']), request.json['intent'], request.json['queries'], request.json['parameters']
+    except KeyError:
+        error_message = 'Key Error, please check the input key.'
+        print(error_message)
+        return error_message
+    except TypeError:
+        error_message = 'Type Error, please check the input type.'
+        print(error_message)
+        return error_message
 
     geno_data = Data(intent, queries, parameters)
     geno_model = global_manager.get_model(dev_id)
@@ -295,8 +315,17 @@ def response():
 
 @app.route('/query/update', methods=['POST'])
 def update_query():
-    dev_id, intent, old_query, new_query, parameters = int(
-        request.json['dev_id']), request.json['intent'], request.json['old_query'], request.json['new_query'], request.json['parameters']
+    try:
+        dev_id, intent, old_query, new_query, parameters = int(
+            request.json['dev_id']), request.json['intent'], request.json['old_query'], request.json['new_query'], request.json['parameters']
+    except KeyError:
+        error_message = 'Key Error, please check the input key.'
+        print(error_message)
+        return error_message
+    except TypeError:
+        error_message = 'Type Error, please check the input type.'
+        print(error_message)
+        return error_message
     model = global_manager.get_model(dev_id)
     return jsonify(model.update_query(intent, old_query, new_query, parameters))
 
