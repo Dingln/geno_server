@@ -216,13 +216,18 @@ class EntityRecognition:
         for entity in query['entities'].values():
             if entity['label'] is not None:
                 if pre_entity != None and entity['label'] == pre_entity['entity']:
-                    print(pre_entity)
+                    # print(pre_entity)
                     pre_entity['end'] = entity['end']
                     pre_entity['text'] = query['text'][pre_entity['start']:pre_entity['end']]
                 else:
                     entity['entity'] = entity.pop('label')
                     ners.append(entity)
                     pre_entity = entity
+        # Check 'this'
+        for ent in ners:
+            if multiple_mode.check_whole_sentence(ent['text']) == False:
+                ners.remove(ent)
+
         # for para in parameters:
         #     ent_dict = {
         #         'text': query[para['start']:para['end']],
@@ -264,6 +269,12 @@ class Multimodal:
     def check_words(self, entity):
         for word in self.activation_words:
             if word in entity:
+                return False
+        return True
+
+    def check_whole_sentence(self, text):
+        for word in self.activation_words:
+            if word == text:
                 return False
         return True
 

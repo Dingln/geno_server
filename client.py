@@ -70,12 +70,12 @@ if __name__ == "__main__":
                                 # [{'label': "color", 'start': 21, 'end': 25}]
                                 ], 
                     'queries': [
-                        {   'text': "Change color to blue",
+                        {   'text': "Change color to this",
                             'entities': {
                                 '0': { 'label': None, 'text': "Change", 'start': 0, 'end': 6 }, 
                                 '7': { 'label': None, 'text': "color", 'start': 7, 'end': 12 }, 
-                                '13': { 'label': "color", 'text': "to", 'start': 13, 'end': 15 }, 
-                                '16': { 'label': "color", 'text': "blue", 'start': 16, 'end': 20 }, 
+                                '13': { 'label': None, 'text': "to", 'start': 13, 'end': 15 }, 
+                                '16': { 'label': "color", 'text': "this", 'start': 16, 'end': 20 }, 
                             },
                             'id': 2
                         },
@@ -97,7 +97,7 @@ if __name__ == "__main__":
         if dev_id == 1:
             print(response(1, "the product of twenty and sixteen"))
         elif dev_id == 2:
-            print(response(2, "change the color to orange"))
+            print(response(2, "Change color to this"))
 
     elif endpoint == "update":
         if dev_id == 2:
