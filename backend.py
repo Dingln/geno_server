@@ -5,10 +5,9 @@ import psutil
 import requests
 import shutil
 import sys
-import spacy
 
 from contextlib import contextmanager
-from flask import Flask, request, jsonify
+from flask import Flask, Response, request, abort, jsonify, g
 from flask_cors import CORS
 
 from rasa.nlu.training_data import load_data
@@ -20,6 +19,7 @@ from rasa.nlu import config
 DEV_LIST_FILE = "devep_data/dev_list"
 RASA_CONFIG_FILE = "config/config.yml"
 
+from functools import wraps
 
 class Manager:
     def __init__(self, dev_file):
@@ -150,20 +150,15 @@ class Model:
             self.train(examples) # Retrain model to remove intent
             return examples
 
-    def update_query(self, intent, old_query, new_query, parameters):
+    def update_query(self, intent, old_text, new_query):
         with self.common_examples() as examples:
             return_query = None
             for (i, example) in enumerate(examples):
-                if example['intent'] == intent and example['text'] == old_query:
-                    examples[i]['text'] = new_query
+                if example['intent'] == intent and example['text'] == old_text:
+                    examples[i]['text'] = new_query['text']
                     examples[i]['entities'] = pretrained_entities.self_choose_single(new_query)
                     return_query = example
                     break
-
-            # TODO: analyze query entities
-            # if return_query:
-            #     return_query['entities'] = []
-
             return return_query 
 
     def delete_query(self, intent, query):
@@ -280,63 +275,74 @@ pretrained_entities = EntityRecognition(use_spacy=False)
 multiple_mode = Multimodal()
 
 
-@app.route('/intent/train', methods=['POST'])
-def train():
-    try:
-        dev_id, intent, queries, parameters = int(
-            request.json['dev_id']), request.json['intent'], request.json['queries'], request.json['parameters']
-    except KeyError:
-        error_message = 'Key Error, please check the input key.'
-        print(error_message)
-        return error_message
-    except TypeError:
-        error_message = 'Type Error, please check the input type.'
-        print(error_message)
-        return error_message
+def validate_params(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if request.method == 'GET':
+            params = request.args
+        elif request.method == 'POST':
+            params = request.json
 
+        message = None
+        status = 200
+
+        # Validate dev_id
+        dev_id = params['dev_id']
+        if dev_id == "":
+            message = "Please configure your unique developer ID in the settings."
+            status = 400
+        elif not dev_id.isnumeric():
+            message = "Developer ID must be a number."
+            status = 400
+        else:
+            g.dev_id = int(dev_id)
+            g.model = global_manager.get_model(g.dev_id)
+        
+        # Abort if error was found
+        if status != 200:
+            print(message)
+            abort(Response(message, status=status))
+        else:
+            return f(*args, **kwargs)
+    
+    return decorated
+
+
+@app.route('/intent/train', methods=['POST'])
+@validate_params
+def train():
+    intent, queries, parameters = request.json['intent'], request.json['queries'], request.json['parameters']
     geno_data = Data(intent, queries, parameters)
-    geno_model = global_manager.get_model(dev_id)
-    return geno_model.train(geno_data.training_data)
+    return g.model.train(geno_data.training_data)
 
 
 @app.route('/intent/delete', methods=['POST'])
+@validate_params
 def delete_intent():
-    dev_id, intent = int(request.json['dev_id']), request.json['intent']
-    model = global_manager.get_model(dev_id)
-    return jsonify(model.delete_intent(intent))
+    intent = request.json['intent']
+    return jsonify(g.model.delete_intent(intent))
 
 
 @app.route('/response', methods=['GET'])
+@validate_params
 def response():
-    dev_id, query = int(request.args['dev_id']), request.args['query']
-    model = global_manager.get_model(dev_id)
-    return model.parse(query)
+    query = request.args['query']
+    return g.model.parse(query)
 
 
 @app.route('/query/update', methods=['POST'])
+@validate_params
 def update_query():
-    try:
-        dev_id, intent, old_query, new_query, parameters = int(
-            request.json['dev_id']), request.json['intent'], request.json['old_query'], request.json['new_query'], request.json['parameters']
-    except KeyError:
-        error_message = 'Key Error, please check the input key.'
-        print(error_message)
-        return error_message
-    except TypeError:
-        error_message = 'Type Error, please check the input type.'
-        print(error_message)
-        return error_message
-    model = global_manager.get_model(dev_id)
-    return jsonify(model.update_query(intent, old_query, new_query, parameters))
+    intent, old_text, new_query = request.json['intent'], request.json['old_text'], request.json['new_query']
+    return jsonify(g.model.update_query(intent, old_text, new_query))
 
 
 @app.route('/query/delete', methods=['POST'])
+@validate_params
 def delete_query():
-    dev_id, intent, query = int(
-        request.json['dev_id']), request.json['intent'], request.json['query']
-    model = global_manager.get_model(dev_id)
-    return jsonify(model.delete_query(intent, query))
+    intent, query = request.json['intent'], request.json['query']
+    return jsonify(g.model.delete_query(intent, query))
 
 
 if __name__ == '__main__':
-    app.run(port=3001, debug=False, threaded=True)
+    app.run(port=3313, debug=False, threaded=True)
