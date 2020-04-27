@@ -104,10 +104,28 @@ if __name__ == "__main__":
             print(update(
                 {
                     'dev_id': 2,
-                    'intent': "check_weather",
-                    'parameters': [{'label': 'location1', 'start': 23, 'end': 27}, {'label': 'location2', 'start': 33, 'end': 41}],
-                    'old_query': "what is the weather in Tokyo and Shanghai",
-                    'new_query': "what is the weather in Tokyo and Shanghai"
+                    'intent': "change_color",
+                    'parameters': [ 'color'], 
+                    'old_query': 
+                        {   'text': "Change color to this",
+                            'entities': {
+                                '0': { 'label': None, 'text': "Change", 'start': 0, 'end': 6 }, 
+                                '7': { 'label': None, 'text': "color", 'start': 7, 'end': 12 }, 
+                                '13': { 'label': None, 'text': "to", 'start': 13, 'end': 15 }, 
+                                '16': { 'label': "color", 'text': "this", 'start': 16, 'end': 20 }, 
+                            },
+                            'id': 2
+                        },
+                    'new_query': 
+                        {   'text': "Change color to blue",
+                            'entities': {
+                                '0': { 'label': None, 'text': "Change", 'start': 0, 'end': 6 }, 
+                                '7': { 'label': None, 'text': "color", 'start': 7, 'end': 12 }, 
+                                '13': { 'label': None, 'text': "to", 'start': 13, 'end': 15 }, 
+                                '16': { 'label': "color", 'text': "blue", 'start': 16, 'end': 20 }, 
+                            },
+                            'id': 2
+                        },
                 }
             ))
 

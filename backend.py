@@ -154,11 +154,18 @@ class Model:
         with self.common_examples() as examples:
             return_query = None
             for (i, example) in enumerate(examples):
-                if example['intent'] == intent and example['text'] == old_query:
-                    examples[i]['text'] = new_query
+                print(example['text'], old_query['text'], example['intent'], intent)
+                if example['intent'] == intent and example['text'] == old_query['text']:
+                    examples[i]['text'] = new_query['text']
                     examples[i]['entities'] = pretrained_entities.self_choose_single(new_query)
                     return_query = example
                     break
+            # retrain 
+            self.training_data = load_data(self.dev_data_dir)
+            trainer = Trainer(config.load(RASA_CONFIG_FILE),
+                            global_manager.builder)
+            self.interpreter = trainer.train(self.training_data)
+            model_directory = trainer.persist("devep_model", fixed_model_name=os.path.basename(self.dev_model_dir))
 
             # TODO: analyze query entities
             # if return_query:
