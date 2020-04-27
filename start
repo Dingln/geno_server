@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# rm -rf devep_data/dev_354803
+# rm -rf devep_data/dev_15755
+# rm -rf devep_data/dev_493422
+# rm -rf devep_model/dev_354803
+# rm -rf devep_model/dev_15755
+# rm -rf devep_model/dev_493422
+./clear.sh
+python3 backend.py;
+

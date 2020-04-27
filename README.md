@@ -4,9 +4,9 @@ In order for Geno to train the model and utilize voice commands, an instance of 
 
 ## Installation
 
-Assuming Python 3 is installed, and you've navigated to this directory via the command line.
+ and you've navigated to this directory via the command line.
 
-1. Create a new virtual environment.
+1. Using Python 3.7+ (3.8 is not supported), create a new virtual environment.
 
     ```
     python3 -m venv .venv
