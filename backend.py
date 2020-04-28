@@ -138,9 +138,17 @@ class Model:
     def update_data(self, new_examples):
         # FIXME: Searching for duplicates is inefficient
         with self.common_examples(new_examples) as examples:
-            for ex in new_examples:
-                if ex not in examples:
-                    examples.append(ex)
+            for new in new_examples:
+                found = False
+                for (i, old) in enumerate(examples):
+                    # Update existing queries that have same text
+                    if old['text'] == new['text']:
+                        examples[i] = new
+                        found = True
+
+                # Append any new examples
+                if not found:
+                    examples.append(new)
 
             return examples
 
@@ -154,8 +162,8 @@ class Model:
         with self.common_examples() as examples:
             return_query = None
             for (i, example) in enumerate(examples):
-                print(example['text'], old_query['text'], example['intent'], intent)
-                if example['intent'] == intent and example['text'] == old_query['text']:
+                print(example['text'], old_text, example['intent'], intent)
+                if example['intent'] == intent and example['text'] == old_text:
                     examples[i]['text'] = new_query['text']
                     examples[i]['entities'] = pretrained_entities.self_choose_single(new_query)
                     return_query = example
