@@ -1,10 +1,10 @@
 # Geno Server
 
-In order for Geno to train the model and utilize voice commands, an instance of this server must be running locally.
+NLU back-end for the Geno IDE. The IDE trains a NLU model for Geno-enabled websites, which is used to understand voice commands by end-users of the website. Currently, the IDE and server are only configured to work locally.
 
 ## Installation
 
- and you've navigated to this directory via the command line.
+Follow these instructions after cloning this repository and navigating to it via the command line.
 
 1. Using Python 3.7+ (3.8 is not supported), create a new virtual environment.
 
